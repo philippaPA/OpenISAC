@@ -1,0 +1,103 @@
+# OFDM Modulator Configuration (B205mini)
+
+# ===== OFDM Frame =====
+fft_size: 1024                 # FFT size (subcarrier count)
+cp_length: 128                 # Cyclic prefix length (samples)
+sync_pos: 1                    # Sync symbol index in one frame
+num_symbols: 100               # Number of OFDM symbols per frame
+sensing_symbol_num: 100        # Number of symbols used in sensing processing
+cuda_mod_pipeline_slots: 3     # Number of CUDA modulation pipeline slots
+zc_root: 29                    # Zadoff-Chu root for sync/preamble
+pilot_positions: [571, 631, 692, 752, 812, 872, 933, 993, 29, 89, 150, 210, 270, 330, 391, 451]  # Comb-pilot subcarrier indices
+midframe_pilot_symbols: []      # Mid-frame BPSK pilot symbols; e.g. [25, 50, 75]
+midframe_pilot_seed: 1296453708  # Deterministic BPSK pilot seed; must match TX/RX
+
+# ===== Sensing FFT =====
+range_fft_size: 1024           # Range FFT size
+doppler_fft_size: 100          # Doppler FFT size
+sensing_output_mode: dense     # dense or compact_mask
+enable_backend_sensing_processing: false  # true lets backend publish RD/CFAR/MD metadata sidecars
+
+# ===== RF / Sampling =====
+sample_rate: 10000000          # Baseband sample rate (Hz)
+bandwidth: 10000000          # Analog bandwidth (Hz), usually same as sample_rate
+center_freq: 2400000000        # RF center frequency (Hz)
+tx_gain: 0                    # TX gain (dB)
+tx_channel: 0                  # TX channel index on USRP
+
+# ===== USRP Device Args =====
+device_args: "type=b200,num_recv_frames=512,num_send_frames=512,send_frame_size=11520,recv_frame_size=11520"
+tx_device_args: ""             # TX-specific args (empty = use device_args)
+rx_device_args: ""             # Default sensing RX args (empty = use device_args)
+
+# ===== Clock / Time Sources =====
+clock_source: internal         # Global clock source: internal/external/gpsdo
+time_source: "internal"        # Global time source: empty -> follow clock_source
+tx_clock_source: ""            # TX clock source override (optional)
+tx_time_source: ""             # TX time source override (optional)
+rx_clock_source: ""            # Sensing RX clock source override (optional)
+rx_time_source: ""             # Sensing RX time source override (optional)
+
+# ===== Wire Format =====
+wire_format_tx: sc8            # TX wire format: sc16/sc8
+wire_format_rx: sc16           # RX wire format: sc16/sc8
+
+# ===== Network Output =====
+udp_input_ip: "0.0.0.0"        # Bind IP for incoming payload UDP packets
+udp_input_port: 50000          # Bind port for incoming payload UDP packets
+mono_sensing_ip: "0.0.0.0"   # Monostatic sensing ZMQ listen IP
+mono_sensing_port: 8888        # Monostatic sensing ZMQ listen port
+control_port: 9999             # ZMQ port for runtime control commands
+sensing_symbol_stride: 20      # Default STRD applied at startup before runtime commands
+
+# ===== Sensing RX Channels =====
+sensing_rx_channel_count: 1    # Number of sensing RX channels (0 disables sensing RX)
+sensing_rx_channels:
+  - usrp_channel: 0            # USRP RX channel index for this sensing path
+    device_args: ""            # Per-channel USRP args override (optional)
+    clock_source: ""           # Per-channel clock source override (optional)
+    time_source: ""            # Per-channel time source override (optional)
+    wire_format_rx: ""         # Per-channel wire format override (optional)
+    rx_gain: 10                # Per-channel RX gain (dB)
+    alignment: 63              # Per-channel timing alignment offset (samples)
+    rx_antenna: "RX2"          # RX antenna port (e.g. RX1/RX2/TX/RX)
+    enable_system_delay_estimation: false  # If true, this channel runs delay estimation only and disables sensing pipeline
+
+# ===== Runtime / Debug =====
+tx_circular_buffer_size: 32    # Modulator frame circular buffer capacity
+data_packet_buffer_size: 32    # Encoded packet buffer capacity
+paired_frame_queue_size: 64    # Keep above tx_circular_buffer_size to cover RX startup/alignment delay
+profiling_modules: ""          # Comma-separated modules to profile (modulation, latency, data_ingest, sensing_proc), or "all"
+cpu_cores:
+  - 1   # TX thread
+  - 2   # Modulation thread
+  - 3   # Data-ingest thread
+  - 4   # Sensing RX thread (CH0)
+  - 5   # Sensing processing thread (CH0)
+  - 6   # Main thread affinity
+
+# ===== Resource Preview =====
+# data_resource_blocks:          # Optional payload / sensing-pilot RE rectangles
+#   - kind: payload              # payload or sensing_pilot
+#     symbol_start: 0            # 0-based absolute frame symbol index
+#     symbol_count: 100
+#     subcarrier_start: 1        # 0-based FFT-bin index
+#     subcarrier_count: 489
+#   - kind: payload
+#     symbol_start: 0
+#     symbol_count: 100
+#     subcarrier_start: 535
+#     subcarrier_count: 489
+#   - kind: sensing_pilot
+#     symbol_start: 21           # Can overlap sync_pos; sync symbol still transmits normal sync content
+#     symbol_count: 1
+#     subcarrier_start: 0
+#     subcarrier_count: 1024
+#                              # Omit the whole key for legacy full-grid payload mapping
+#                              # Use [] to disable payload RE entirely
+# sensing_mask_blocks: []        # Optional compact sensing RE rectangles (safe to keep empty in dense mode)
+# # sensing_mask_blocks:         # Used only when sensing_output_mode=compact_mask
+# #   - symbol_start: 21
+# #     symbol_count: 1
+# #     subcarrier_start: 0
+# #     subcarrier_count: 1024
