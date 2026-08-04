@@ -111,6 +111,28 @@ _DROP_WARNING_COUNTS = {}
 _DROP_WARNING_LOCK = threading.Lock()
 
 
+class ScaledHzAxisItem(pg.AxisItem):
+    """Display existing plot coordinates as physical Doppler frequency."""
+
+    def __init__(self, orientation, coordinate_to_hz=1.0):
+        super().__init__(orientation=orientation)
+        # Tick strings are already converted to Hz below. PyQtGraph's SI
+        # prefixing would otherwise add a misleading multiplier based on the
+        # unconverted bin/normalized coordinates.
+        self.enableAutoSIPrefix(False)
+        self.coordinate_to_hz = float(coordinate_to_hz)
+
+    def set_coordinate_to_hz(self, value):
+        value = float(value)
+        self.coordinate_to_hz = value if np.isfinite(value) and value > 0.0 else 1.0
+        self.picture = None
+        self.update()
+
+    def tickStrings(self, values, scale, spacing):
+        hz_values = [float(value) * self.coordinate_to_hz for value in values]
+        return [f"{value:g}" for value in hz_values]
+
+
 def _warn_drop(key, increment, message, *args):
     increment = max(1, int(increment))
     with _DROP_WARNING_LOCK:
@@ -3375,13 +3397,17 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.addWidget(plot_widget, stretch=1)
 
         # Range-Doppler Plot
-        self.rd_plot = pg.PlotWidget(title="Range-Doppler Spectrum")
+        self.rd_doppler_axis = ScaledHzAxisItem("bottom")
+        self.rd_plot = pg.PlotWidget(
+            title="Range-Doppler Spectrum",
+            axisItems={"bottom": self.rd_doppler_axis},
+        )
         style_spectrum_plot(self.rd_plot)
         # RD uses col-major mapping: x <- first index(doppler), y <- second index(range)
         self.rd_img = pg.ImageItem(axisOrder='col-major')
         self.rd_plot.addItem(self.rd_img)
         self.rd_plot.setLabel('left', 'Range Bin')
-        self.rd_plot.setLabel('bottom', 'Doppler Bin')
+        self.rd_plot.setLabel('bottom', 'Doppler Frequency (Hz)')
         spectrum_cmap = sensing_colormap()
         self.rd_img.setLookupTable(spectrum_cmap.getLookupTable())
         rd_default_db_levels = get_delay_doppler_display_db_range()
@@ -3404,12 +3430,16 @@ class MainWindow(QtWidgets.QMainWindow):
         plot_layout.addWidget(self.rd_plot)
 
         # Micro-Doppler Plot
-        self.md_plot = pg.PlotWidget(title="Micro-Doppler Spectrum")
+        self.md_doppler_axis = ScaledHzAxisItem("left")
+        self.md_plot = pg.PlotWidget(
+            title="Micro-Doppler Spectrum",
+            axisItems={"left": self.md_doppler_axis},
+        )
         style_spectrum_plot(self.md_plot)
         # MD uses row-major mapping: x <- second index(time), y <- first index(doppler)
         self.md_img = pg.ImageItem(axisOrder='row-major')
         self.md_plot.addItem(self.md_img)
-        self.md_plot.setLabel('left', 'Doppler')
+        self.md_plot.setLabel('left', 'Doppler Frequency (Hz)')
         self.md_plot.setLabel('bottom', 'Time')
         self.md_img.setLookupTable(spectrum_cmap.getLookupTable())
         md_default_db_levels = get_micro_doppler_display_db_range()
@@ -5789,6 +5819,43 @@ class MainWindow(QtWidgets.QMainWindow):
             f"fc={self.center_freq_hz/1e9:.3f} GHz ({calib_tag})"
         )
 
+    def _update_doppler_axes(self, ch, rd_rows):
+        params = get_viewer_params(ch)
+        sample_rate = float(params.sample_rate_hz)
+        # Hz-axis calibration needs the true OFDM FFT size and CP length,
+        # which only V8+ senders put on the wire. Legacy V7 senders have no
+        # reliable stand-in: active_cols is min(fft_size, range_fft_size),
+        # not fft_size, so substituting it silently mislabels the axes
+        # whenever those two sizes differ. Fall back to bin/normalized
+        # display for anything below V8 instead of guessing.
+        is_v8_or_newer = int(params.version) >= 8
+        fft_size = int(params.ofdm_fft_size) if is_v8_or_newer else 0
+        cp_length = int(params.cp_length) if is_v8_or_newer else 0
+        try:
+            ui_stride = int(self.txt_strd.text())
+        except (TypeError, ValueError):
+            ui_stride = 0
+        stride = (
+            int(params.sensing_symbol_stride)
+            if int(params.sensing_symbol_stride) > 0
+            else ui_stride
+        )
+        if sample_rate <= 0.0 or fft_size <= 0 or cp_length < 0 or stride <= 0:
+            self.rd_doppler_axis.set_coordinate_to_hz(1.0)
+            self.md_doppler_axis.set_coordinate_to_hz(1.0)
+            self.rd_plot.setLabel('bottom', 'Doppler Bin')
+            self.md_plot.setLabel('left', 'Normalized Doppler')
+            return
+
+        slow_time_rate_hz = sample_rate / (float(fft_size + cp_length) * float(stride))
+        rd_bin_hz = slow_time_rate_hz / float(max(1, int(rd_rows)))
+        self.rd_doppler_axis.set_coordinate_to_hz(rd_bin_hz)
+        # scipy.signal.stft is evaluated with fs=1, so its vertical coordinates
+        # are cycles per slow-time sample and scale directly by the slow-time rate.
+        self.md_doppler_axis.set_coordinate_to_hz(slow_time_rate_hz)
+        self.rd_plot.setLabel('bottom', 'Doppler Frequency (Hz)')
+        self.md_plot.setLabel('left', 'Doppler Frequency (Hz)')
+
     def update_plots(self):
         updated_any = False
 
@@ -5887,6 +5954,8 @@ class MainWindow(QtWidgets.QMainWindow):
             latest_disp = ch.current_display_data
             rd_data = latest_disp.get('rd')
             md_data = latest_disp.get('md')
+            rd_rows = rd_data.shape[0] if rd_data is not None and rd_data.ndim == 2 else 1
+            self._update_doppler_axes(ch, rd_rows)
             overlay_points = self._get_overlay_cluster_points(latest_disp)
             frame_id = int(latest_disp.get('frame_id', -1))
             display_render_key = (display_channel, frame_id)

@@ -4764,7 +4764,7 @@ enum class SensingViewerWireDataFormat : uint32_t {
 inline constexpr uint32_t kSensingMetadataFlagCfarEnabled = 1u << 0;
 inline constexpr uint32_t kSensingMetadataFlagMicroDopplerEnabled = 1u << 1;
 
-inline constexpr uint32_t kSensingViewerParamsVersion = 7u;
+inline constexpr uint32_t kSensingViewerParamsVersion = 8u;
 inline constexpr uint32_t kSensingViewerFlagCompactMask = 1u << 0;
 inline constexpr uint32_t kSensingViewerFlagCompactLocalDelayDoppler = 1u << 1;
 inline constexpr uint32_t kSensingViewerFlagSkipSensingFft = 1u << 2;
@@ -4800,10 +4800,14 @@ struct SensingViewerParamsPacket {
     uint32_t center_freq_hz_div100 = 0; // center_freq / 100 (units: 100 Hz; uint32 covers up to ~429 GHz)
     uint32_t sample_rate_hz_div100 = 0; // sample_rate / 100 (units: 100 Hz; uint32 covers up to ~429 GHz)
     uint32_t antenna_spacing_um = 0;    // physical ULA element spacing in micrometres (0 = not provided)
+    // V8 additions used to convert Doppler bins to physical frequency.
+    uint32_t ofdm_fft_size = 0;
+    uint32_t cp_length = 0;
+    uint32_t sensing_symbol_stride = 0;
 };
 #pragma pack(pop)
 
-static_assert(sizeof(SensingViewerParamsPacket) == 88, "SensingViewerParamsPacket size mismatch");
+static_assert(sizeof(SensingViewerParamsPacket) == 100, "SensingViewerParamsPacket size mismatch");
 
 inline std::vector<uint8_t> serialize_sensing_metadata(
     const SensingMetadata& metadata,
@@ -5048,7 +5052,8 @@ inline SensingViewerParamsPacket make_sensing_viewer_params_packet(
     uint32_t stream_channel_count = 1,
     uint32_t stream_channel_mask = 0x1u,
     bool aggregated_stream = false,
-    double antenna_spacing_m = 0.0)
+    double antenna_spacing_m = 0.0,
+    size_t sensing_symbol_stride = 0)
 {
     SensingViewerParamsPacket packet{};
     std::memcpy(packet.header, "CTRL", 4);
@@ -5089,6 +5094,10 @@ inline SensingViewerParamsPacket make_sensing_viewer_params_packet(
         packet.antenna_spacing_um = htonl(static_cast<uint32_t>(
             std::llround(std::clamp(antenna_spacing_m * 1e6, 0.0, 4294967295.0))));
     }
+    packet.ofdm_fft_size = htonl(static_cast<uint32_t>(cfg.ofdm.fft_size));
+    packet.cp_length = htonl(static_cast<uint32_t>(cfg.ofdm.cp_length));
+    packet.sensing_symbol_stride = htonl(static_cast<uint32_t>(
+        sensing_symbol_stride > 0 ? sensing_symbol_stride : cfg.sensing.symbol_stride));
     return packet;
 }
 

@@ -1058,7 +1058,8 @@ private:
             stream_channel_count,
             stream_channel_mask,
             aggregated_stream,
-            antenna_spacing_m);
+            antenna_spacing_m,
+            snapshot.sensing_symbol_stride);
         return packet;
     }
 

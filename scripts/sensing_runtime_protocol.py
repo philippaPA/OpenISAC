@@ -50,7 +50,8 @@ PARAMS_PACKET_STRUCT_V1 = struct.Struct("!4s4s11I")
 PARAMS_PACKET_STRUCT_V3 = struct.Struct("!4s4s13I")
 PARAMS_PACKET_STRUCT_V4 = struct.Struct("!4s4s14I")
 PARAMS_PACKET_STRUCT_V5 = struct.Struct("!4s4s17I")   # same layout as old "current"
-PARAMS_PACKET_STRUCT    = struct.Struct("!4s4s20I")   # V7: +center_freq_hz_div100, sample_rate_hz_div100, antenna_spacing_um
+PARAMS_PACKET_STRUCT_V7 = struct.Struct("!4s4s20I")
+PARAMS_PACKET_STRUCT    = struct.Struct("!4s4s23I")   # V8: +OFDM FFT size, CP length, sensing stride
 COMPACT_HEADER_STRUCT = struct.Struct("!IIIQ")
 AGGREGATE_HEADER_STRUCT = struct.Struct("!IIIIQ")
 REQUEST_PACKET_STRUCT = struct.Struct("!4s4si")
@@ -91,6 +92,9 @@ class ViewerRuntimeParams:
     center_freq_hz: float = 0.0          # 0.0 = not provided
     sample_rate_hz: float = 0.0          # 0.0 = not provided
     antenna_spacing_m: float = 0.0       # 0.0 = not provided (only sent in sim mode)
+    ofdm_fft_size: int = 0
+    cp_length: int = 0
+    sensing_symbol_stride: int = 0
 
     def is_compact_mask(self) -> bool:
         return bool(self.flags & FLAG_COMPACT_MASK)
@@ -339,8 +343,23 @@ def parse_params_packet(data: bytes) -> ViewerRuntimeParams | None:
     center_freq_raw = 0
     sample_rate_hz_div100 = 0
     antenna_spacing_um = 0
+    ofdm_fft_size = 0
+    cp_length = 0
+    sensing_symbol_stride = 0
 
     if len(data) >= PARAMS_PACKET_STRUCT.size:
+        # V8: includes radio parameters and OFDM timing needed for physical axes.
+        (
+            header, command, version, flags, frame_format,
+            wire_rows, wire_cols, active_rows, active_cols,
+            frame_symbol_period, range_fft_size, doppler_fft_size,
+            compact_mask_hash, wire_data_format, stream_channel_count,
+            stream_channel_mask, os_cfar_rank_percent_x100,
+            os_cfar_suppress_doppler, os_cfar_suppress_range,
+            center_freq_raw, sample_rate_hz_div100, antenna_spacing_um,
+            ofdm_fft_size, cp_length, sensing_symbol_stride,
+        ) = PARAMS_PACKET_STRUCT.unpack_from(data)
+    elif len(data) >= PARAMS_PACKET_STRUCT_V7.size:
         # V6/V7: includes center_freq, sample_rate, antenna_spacing.
         # V6 encoded center_freq * 10 and overflowed above ~429 MHz; V7 uses
         # center_freq / 100 to cover RF carriers with 100 Hz resolution.
@@ -352,7 +371,7 @@ def parse_params_packet(data: bytes) -> ViewerRuntimeParams | None:
             stream_channel_mask, os_cfar_rank_percent_x100,
             os_cfar_suppress_doppler, os_cfar_suppress_range,
             center_freq_raw, sample_rate_hz_div100, antenna_spacing_um,
-        ) = PARAMS_PACKET_STRUCT.unpack_from(data)
+        ) = PARAMS_PACKET_STRUCT_V7.unpack_from(data)
     elif len(data) >= PARAMS_PACKET_STRUCT_V5.size:
         # V5 (17 uint32 fields, no radio params)
         (
@@ -421,6 +440,9 @@ def parse_params_packet(data: bytes) -> ViewerRuntimeParams | None:
         center_freq_hz=center_freq_hz,
         sample_rate_hz=sample_rate_hz,
         antenna_spacing_m=antenna_spacing_m,
+        ofdm_fft_size=max(0, int(ofdm_fft_size)),
+        cp_length=max(0, int(cp_length)),
+        sensing_symbol_stride=max(0, int(sensing_symbol_stride)),
     )
 
 

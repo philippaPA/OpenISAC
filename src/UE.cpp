@@ -2918,7 +2918,8 @@ private:
                     snapshot.cfar_os_suppress_doppler,
                     snapshot.cfar_os_suppress_range,
                     true,
-                    1u, 0x1u, false, 0.0);
+                    1u, 0x1u, false, 0.0,
+                    snapshot.sensing_symbol_stride);
             _control_handler.send_sensing_viewer_params(peer, packet);
         });
     }
