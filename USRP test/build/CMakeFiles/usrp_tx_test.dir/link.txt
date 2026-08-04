@@ -1,1 +1,0 @@
-/usr/bin/c++     CMakeFiles/usrp_tx_test.dir/usrp_tx_test.cpp.o  -o usrp_tx_test  -Wl,-rpath,/usr/local/lib /usr/local/lib/libuhd.so 

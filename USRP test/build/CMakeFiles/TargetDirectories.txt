@@ -1,3 +1,0 @@
-/home/morello/workarea/OpenISAC/USRP test/build/CMakeFiles/edit_cache.dir
-/home/morello/workarea/OpenISAC/USRP test/build/CMakeFiles/rebuild_cache.dir
-/home/morello/workarea/OpenISAC/USRP test/build/CMakeFiles/usrp_tx_test.dir
