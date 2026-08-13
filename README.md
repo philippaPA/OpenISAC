@@ -1,11 +1,11 @@
 
 
 > [!IMPORTANT]
-2
+
 > **PA Users:** Please read **PA_README.md** before following the instructions in this document.
-3
+
 >
-4
+
 > PA_README.md contains project-specific setup instructions, hardware configuration, experiment procedures, modifications, and handover notes for the PA drone detection project.
 
 <p align="center">
