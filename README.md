@@ -2,11 +2,11 @@
 
 > [!IMPORTANT]
 
-> **PA Users:** Please read **PA_README.md** before following the instructions in this document.
+> **PA Users:** Please read **PA_README.md**. I have spent countless hours, weeks, and years working out how this works. This README was of no help.
 
 >
 
-> PA_README.md contains project-specific setup instructions, hardware configuration, experiment procedures, modifications, and handover notes for the PA drone detection project.
+> PA_README.md contains project-specific setup instructions, hardware configuration, experiment procedures, modifications, and handover notes for the PA drone detection project conducted by Henry Teall and Philippa Flintoff
 
 <p align="center">
   <picture>
