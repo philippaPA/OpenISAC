@@ -81,9 +81,9 @@ cp ../config/BS_B205.yaml BS.yaml
 
 Do this first — both calibration and the sensor run below start `BS` from `build/`, and it reads `BS.yaml` from that directory.
 
-## CPU performance (core prioritisation)
+## CPU performance (core prioritisation, optional)
 
-Run this before starting `BS`, whether for calibration or a real run:
+Not required to get the sensor running, but the script is in the repo if you hit real-time performance issues (dropped samples, jitter). Run it before starting `BS`, whether for calibration or a real run:
 
 ```bash
 ./scripts/set_performance.bash
