@@ -110,7 +110,7 @@ Keep the app's own real-time threads off whatever cores you dedicate to IRQs.
 
 ## Calibration
 
-Do this before running the sensor for real. Two separate calibrations, don't confuse them:
+Do this before running the sensor for real. Two separate calibrations:
 
 **Hsys (system response) calibration** — needed whenever you change frequency. This characterizes the SDR's own TX/RX filter+DAC/ADC response. Connect TX to RX with a direct RF cable (not the normal antennas, add an inline attenuator if the loopback is too hot), then run `scripts/calibrate_hsys.py` (or click `Calibrate Hsys` in the sensing viewer). It drops TX/RX gain for the loopback capture and restores your normal gains afterwards.
 
