@@ -1568,6 +1568,8 @@ class MainWindow(QtWidgets.QMainWindow):
         except ValueError:
             print(f"Invalid antenna spacing: {self.txt_antenna_spacing_mm.text()}")
             self.txt_antenna_spacing_mm.setText(f"{self.antenna_spacing_m * 1e3:.3f}")
+
+    def set_target_sector_range(self) -> None:
         try:
             zero_bin = max(0, int(self.txt_sector_zero_bin.text()))
             max_bin = max(1, int(self.txt_sector_max_bin.text()))

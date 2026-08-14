@@ -225,6 +225,13 @@ public:
         _usrp->set_rx_antenna(ant, chan);
     }
 
+    void set_rx_dc_offset_correction(bool enabled, size_t chan) override {
+        _usrp->set_rx_dc_offset(enabled, chan);
+    }
+    void set_rx_iq_balance_correction(bool enabled, size_t chan) override {
+        _usrp->set_rx_iq_balance(enabled, chan);
+    }
+
     TuneResult set_tx_freq(const TuneRequest& req, size_t chan) override {
         return from_uhd(_usrp->set_tx_freq(to_uhd(req), chan));
     }

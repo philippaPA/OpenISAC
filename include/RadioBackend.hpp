@@ -116,6 +116,12 @@ public:
     virtual GainRange get_rx_gain_range(size_t /*chan*/ = 0) const { return GainRange{}; }
     virtual void set_rx_antenna(const std::string& /*ant*/, size_t /*chan*/ = 0) {}
 
+    // Automatic RX front-end correction. No-ops on backends that don't model
+    // analog impairments (e.g. the simulator). Real hardware: enables the
+    // driver's running-average DC-offset tracker / IQ-imbalance tracker.
+    virtual void set_rx_dc_offset_correction(bool /*enabled*/, size_t /*chan*/ = 0) {}
+    virtual void set_rx_iq_balance_correction(bool /*enabled*/, size_t /*chan*/ = 0) {}
+
     // Tuning.
     virtual TuneResult set_tx_freq(const TuneRequest& req, size_t chan = 0) = 0;
     virtual TuneResult set_rx_freq(const TuneRequest& req, size_t chan = 0) = 0;

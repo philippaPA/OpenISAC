@@ -181,6 +181,8 @@ struct SensingRxChannelConfig {
     double rx_gain = 0.0;               // RX gain for this channel
     int32_t alignment = 63;             // Per-channel alignment offset (samples)
     std::string rx_antenna = "";        // RX antenna for this channel (e.g., TX/RX, RX1)
+    bool rx_dc_offset_correction = true;  // UHD automatic RX DC-offset tracking (set_rx_dc_offset)
+    bool rx_iq_balance_correction = true; // UHD automatic RX IQ-imbalance tracking (set_rx_iq_balance)
     bool enable_system_delay_estimation = false; // Enable per-channel system delay estimation mode
     bool enable_sensing_output = true;  // Enable ZMQ output for this sensing channel
     int rx_cpu_core = -1;               // Dedicated SensingChannel::_rx_loop core; -1 = no explicit binding
@@ -3484,6 +3486,12 @@ inline bool load_bs_config_from_yaml(Config& cfg, const std::string& filepath) {
                 if (node["rx_gain"]) ch.rx_gain = node["rx_gain"].as<double>();
                 if (node["alignment"]) ch.alignment = node["alignment"].as<int32_t>();
                 if (node["rx_antenna"]) ch.rx_antenna = node["rx_antenna"].as<std::string>();
+                if (node["rx_dc_offset_correction"]) {
+                    ch.rx_dc_offset_correction = node["rx_dc_offset_correction"].as<bool>();
+                }
+                if (node["rx_iq_balance_correction"]) {
+                    ch.rx_iq_balance_correction = node["rx_iq_balance_correction"].as<bool>();
+                }
                 if (node["enable_system_delay_estimation"]) {
                     ch.enable_system_delay_estimation =
                         node["enable_system_delay_estimation"].as<bool>();

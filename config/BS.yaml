@@ -33,8 +33,8 @@ cuda:
 
 # ===== Downlink =====
 downlink:
-  center_freq: 5.8e9  # RF center frequency (Hz) — 5.5 GHz; within B205mini/AD9364 tuning range (70 MHz - 6 GHz), verify local TX licensing at this frequency
-  tx_gain: 30  # TX gain (dB) — carried over from B210 template; re-check against B205mini's normalized gain range before first transmit
+  center_freq: 5500000000  # RF center frequency (Hz) — 5.5 GHz; within B205mini/AD9364 tuning range (70 MHz - 6 GHz), verify local TX licensing at this frequency
+  tx_gain: 60  # TX gain (dB) — carried over from B210 template; re-check against B205mini's normalized gain range before first transmit
   tx_channel: 0  # TX channel index on USRP (B205mini exposes only channel 0)
   tx_device_args: ""  # TX-specific args (empty = use device_args)
   tx_clock_source: ""  # TX clock source override (optional)
@@ -85,12 +85,10 @@ sensing:
       clock_source: ""  # Per-channel clock source override (optional)
       time_source: ""  # Per-channel time source override (optional)
       wire_format: ""  # Per-channel wire format override (optional)
-      rx_gain: 1  # Per-channel RX gain (dB)
-      alignment: 166  # Per-channel timing alignment offset (samples)
+      rx_gain: 30  # Per-channel RX gain (dB)
+      alignment: 63  # Per-channel timing alignment offset (samples)
       rx_antenna: RX2  # Use the RX2 SMA port to physically separate sensing RX from the TX/RX port used for downlink TX
-      rx_dc_offset_correction: true  # UHD automatic RX DC-offset tracking (set_rx_dc_offset); set false to go back to no correction
-      rx_iq_balance_correction: true  # UHD automatic RX IQ-imbalance tracking (set_rx_iq_balance); set false to go back to no correction
-      enable_system_delay_estimation: false  # If true, this channel runs delay estimation only and disables sensing pipeline
+      enable_system_delay_estimation: true  # If true, this channel runs delay estimation only and disables sensing pipeline
       rx_cpu_core: 4  # CPU core for SensingChannel::_rx_loop (-1 disables explicit binding)
       processing_cpu_core: 5  # CPU core for SensingChannel::_sensing_loop (-1 disables explicit binding)
   range_fft_size: 1024  # Range FFT size
@@ -126,5 +124,4 @@ logging:
   default_level: warn  # off|error|warn|info|debug — global default; Error always prints when force_error=true
   timestamps: false  # Prefix each line with local HH:MM:SS.uuuuuu
   force_error: true  # Always emit Error (unrecoverable failures only)
-  modules:
-    sensing: info  # Show SYSDLY / Hsys calibration progress without raising the global log level
+  modules: {}  # Optional overrides, e.g. demod.ldpc: debug, cuda.demod: warn, ul_rx: warn

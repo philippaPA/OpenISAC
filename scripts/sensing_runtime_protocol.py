@@ -21,6 +21,9 @@ REQ_HEADER = b"REQ "
 READY_COMMAND = b"RDY "
 PARAMS_COMMAND = b"PARM"
 CALIBRATE_SYSTEM_RESPONSE_COMMAND = b"CALB"
+# TX-off ambient/self-interference baseline capture (additive, deployed
+# antennas) -- distinct from CALB (multiplicative, TX-on loopback cable).
+CALIBRATE_DC_BASELINE_COMMAND = b"CALD"
 CHANNEL_SIM_SNR_COMMAND = b"SNR "
 CHANNEL_SIM_SNR_DISABLED = -(2**31)
 # Duplex uplink timing controls.
@@ -319,6 +322,10 @@ def build_control_command(command: bytes, value: int = 0) -> bytes:
 
 def build_system_response_calibration_command(value: int = 0) -> bytes:
     return build_control_command(CALIBRATE_SYSTEM_RESPONSE_COMMAND, value)
+
+
+def build_dc_baseline_calibration_command(value: int = 0) -> bytes:
+    return build_control_command(CALIBRATE_DC_BASELINE_COMMAND, value)
 
 
 def build_channel_sim_snr_command(snr_db: float | None) -> bytes:

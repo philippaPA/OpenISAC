@@ -376,6 +376,7 @@ else
 fi
 
 echo "Disabling real-time throttling..."
-run_priv bash -lc 'cd /sys/kernel/debug/sched/ && echo RT_RUNTIME_SHARE > features'
+run_priv bash -lc 'cd /sys/kernel/debug/sched/ && echo RT_RUNTIME_SHARE > features' \
+    || echo "  (debugfs write failed, likely blocked by Secure Boot kernel lockdown; continuing anyway)"
 
 echo "Done."

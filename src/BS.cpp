@@ -1367,6 +1367,33 @@ private:
             request_one(static_cast<uint32_t>(target));
         });
 
+        _control_handler.register_command("CALD", [this](int32_t value) {
+            if (_sensing_channels.empty()) {
+                LOG_G_WARN_M(Sensing) << "CALD ignored: no sensing RX channels configured";
+                return;
+            }
+
+            const size_t target_symbols = value <= 0 ? 0u : static_cast<size_t>(value);
+            const int64_t target = _align_target_channel.load();
+
+            auto request_one = [&](uint32_t ch_id) {
+                if (ch_id >= _sensing_channels.size()) {
+                    LOG_G_WARN_M(Sensing) << "Invalid target channel for CALD: " << ch_id;
+                    return;
+                }
+                _sensing_channels[ch_id]->request_dc_baseline_calibration(target_symbols);
+            };
+
+            if (target < 0) {
+                for (uint32_t i = 0; i < _sensing_channels.size(); ++i) {
+                    request_one(i);
+                }
+                return;
+            }
+
+            request_one(static_cast<uint32_t>(target));
+        });
+
         _control_handler.register_request("PARM", [this](int32_t, const ControlCommandHandler::ControlPeer& peer) {
             _send_viewer_params(peer);
         });

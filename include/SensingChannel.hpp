@@ -85,6 +85,10 @@ public:
     bool set_rx_gain(double requested_gain_db, double* applied_gain_db = nullptr);
     void apply_shared_cfg(const SharedSensingRuntime& snapshot);
     void request_system_response_calibration(size_t target_symbols = 0);
+    // Capture a TX-off ambient/self-interference baseline over the deployed
+    // antennas. Caller must mute TX (e.g. drive tx_gain to its minimum via the
+    // existing runtime gain control) before calling and restore it after.
+    void request_dc_baseline_calibration(size_t target_symbols = 0);
 
     uint32_t logical_id() const;
     int32_t target_alignment() const;
@@ -131,6 +135,20 @@ private:
         AlignedVector inverse_response;
         AlignedVector accumulator;
         float min_valid_power = 0.0f;
+        size_t target_symbols = 0;
+        size_t captured_symbols = 0;
+        bool loaded = false;
+        bool capture_active = false;
+    };
+
+    // TX-off ambient/self-interference baseline: an additive per-subcarrier
+    // complex offset (post channel-estimate domain), captured with TX muted
+    // over the deployed antennas. Distinct from SystemResponseCalibrationState,
+    // which is a multiplicative loopback-cable equalization captured with TX on.
+    struct DcBaselineCalibrationState {
+        std::string file_path;
+        AlignedVector baseline;
+        AlignedVector accumulator;
         size_t target_symbols = 0;
         size_t captured_symbols = 0;
         bool loaded = false;
@@ -333,6 +351,22 @@ private:
         AlignedVector& compact_output,
         const std::vector<int>& raw_subcarrier_indices
     );
+    // Dense/full-band path only -- compact-mask modes are out of scope for now
+    // (see _can_capture_full_band_system_response, reused as the same guard).
+    std::string _dc_baseline_calibration_file_path() const;
+    void _load_dc_baseline_calibration();
+    void _accumulate_dc_baseline_calibration(
+        const AlignedVector& channel_buf,
+        size_t range_stride,
+        size_t symbol_count,
+        size_t fft_size
+    );
+    void _apply_dc_baseline_calibration(
+        AlignedVector& channel_buf,
+        size_t range_stride,
+        size_t symbol_count,
+        size_t fft_size
+    );
 
     const Config& _cfg;
     SensingRole _role = SensingRole::Monostatic;
@@ -353,6 +387,8 @@ private:
     bool _has_pending_shared_cfg = false;
     std::mutex _system_response_mutex;
     SystemResponseCalibrationState _system_response_calibration;
+    std::mutex _dc_baseline_mutex;
+    DcBaselineCalibrationState _dc_baseline_calibration;
     std::atomic<bool> _stop_requested{false};
 };
 

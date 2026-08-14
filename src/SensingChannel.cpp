@@ -67,6 +67,10 @@ constexpr uint32_t kSystemResponseRoleMonostatic = 1;
 constexpr uint32_t kSystemResponseRoleBistatic = 2;
 constexpr char kSystemResponseMagic[8] = {'O', 'I', 'S', 'A', 'C', 'H', '1', '\0'};
 
+constexpr size_t kDefaultDcBaselineCalibrationSymbols = 1000;
+constexpr uint32_t kDcBaselineCalibrationVersion = 1;
+constexpr char kDcBaselineMagic[8] = {'O', 'I', 'S', 'A', 'D', 'C', '1', '\0'};
+
 #pragma pack(push, 1)
 struct SystemResponseCalibrationFileHeader {
     char magic[8];
@@ -98,6 +102,16 @@ std::string make_system_response_calibration_filename(
 {
     std::ostringstream oss;
     oss << "sensing_system_response_" << sensing_role_label(role)
+        << "_ch" << logical_id << ".bin";
+    return oss.str();
+}
+
+std::string make_dc_baseline_calibration_filename(
+    SensingChannel::SensingRole role,
+    uint32_t logical_id)
+{
+    std::ostringstream oss;
+    oss << "sensing_dc_baseline_" << sensing_role_label(role)
         << "_ch" << logical_id << ".bin";
     return oss.str();
 }
@@ -159,6 +173,29 @@ AlignedVector compute_system_response_inverse(
         }
     }
     return inverse_response;
+}
+
+SystemResponseCalibrationFileHeader make_dc_baseline_header(
+    const Config& cfg,
+    SensingChannel::SensingRole role,
+    uint32_t logical_id,
+    size_t captured_symbols)
+{
+    // Reuses the same on-disk header layout as the Hsys loopback calibration
+    // (magic differs, so the two files/purposes can never be cross-loaded).
+    SystemResponseCalibrationFileHeader header{};
+    std::memcpy(header.magic, kDcBaselineMagic, sizeof(header.magic));
+    const char* mode = sensing_role_label(role);
+    std::strncpy(header.mode, mode, sizeof(header.mode) - 1);
+    header.version = kDcBaselineCalibrationVersion;
+    header.role = sensing_role_id(role);
+    header.logical_id = logical_id;
+    header.fft_size = static_cast<uint32_t>(cfg.ofdm.fft_size);
+    header.sample_rate = cfg.rf_sampling.sample_rate;
+    header.center_freq = cfg.downlink.center_freq;
+    header.bandwidth = cfg.rf_sampling.bandwidth;
+    header.captured_symbols = static_cast<uint64_t>(captured_symbols);
+    return header;
 }
 
 SystemResponseCalibrationFileHeader make_system_response_header(
@@ -1062,6 +1099,7 @@ SensingChannel::SensingChannel(
     }
 
     _load_system_response_calibration();
+    _load_dc_baseline_calibration();
 
     if (_compute.delay_estimation_enabled && _compute.sensing_pipeline_disabled_by_mode) {
         LOG_G_INFO_M(Sensing) << "[Sensing CH " << _rx_io.logical_id
@@ -1649,6 +1687,223 @@ void SensingChannel::_apply_sparse_compact_system_response_calibration(
     }
 }
 
+// ---------------------------------------------------------------------------
+// TX-off DC/self-interference baseline (dense/full-band path only).
+//
+// Unlike the Hsys loopback calibration above (multiplicative, TX on, cable
+// loopback), this captures an additive per-subcarrier complex offset with TX
+// muted over the actual deployed antennas, and subtracts it from live frames.
+// To go back: delete the sensing_dc_baseline_*.bin file, or just never call
+// request_dc_baseline_calibration() -- with no file on disk this whole path
+// is inert (_apply_dc_baseline_calibration returns immediately on !loaded).
+// ---------------------------------------------------------------------------
+
+void SensingChannel::request_dc_baseline_calibration(size_t target_symbols) {
+    const size_t resolved_target =
+        (target_symbols == 0) ? kDefaultDcBaselineCalibrationSymbols : target_symbols;
+    if (resolved_target == 0) {
+        return;
+    }
+
+    if (_compute.sensing_pipeline_disabled_by_mode) {
+        LOG_G_WARN_M(Sensing) << "[Sensing DCBL " << sensing_role_label(_role)
+                     << " CH " << _rx_io.logical_id
+                     << "] CALD ignored: sensing pipeline is disabled for this channel";
+        return;
+    }
+    if (!_can_capture_full_band_system_response()) {
+        LOG_G_WARN_M(Sensing) << "[Sensing DCBL " << sensing_role_label(_role)
+                     << " CH " << _rx_io.logical_id
+                     << "] CALD ignored: full-band DC-baseline capture requires dense mode "
+                     << "or a full-band regular compact mask";
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(_dc_baseline_mutex);
+        auto& cal = _dc_baseline_calibration;
+        cal.file_path = _dc_baseline_calibration_file_path();
+        if (cal.accumulator.size() != _cfg.ofdm.fft_size) {
+            cal.accumulator.assign(_cfg.ofdm.fft_size, std::complex<float>(0.0f, 0.0f));
+        } else {
+            std::fill(cal.accumulator.begin(), cal.accumulator.end(), std::complex<float>(0.0f, 0.0f));
+        }
+        cal.target_symbols = resolved_target;
+        cal.captured_symbols = 0;
+        cal.capture_active = true;
+    }
+
+    LOG_G_INFO_M(Sensing) << "[Sensing DCBL " << sensing_role_label(_role)
+                 << " CH " << _rx_io.logical_id
+                 << "] started TX-off DC baseline capture: target_symbols="
+                 << resolved_target
+                 << ", output_file=" << _dc_baseline_calibration_file_path()
+                 << ". Mute TX (tx_gain to minimum) before this completes.";
+}
+
+std::string SensingChannel::_dc_baseline_calibration_file_path() const {
+    return make_dc_baseline_calibration_filename(_role, _rx_io.logical_id);
+}
+
+void SensingChannel::_load_dc_baseline_calibration() {
+    const std::string file_path = _dc_baseline_calibration_file_path();
+    {
+        std::lock_guard<std::mutex> lock(_dc_baseline_mutex);
+        _dc_baseline_calibration.file_path = file_path;
+        _dc_baseline_calibration.loaded = false;
+        _dc_baseline_calibration.baseline.clear();
+    }
+
+    std::ifstream in(file_path, std::ios::binary);
+    if (!in) {
+        LOG_G_INFO_M(Sensing) << "[Sensing DCBL " << sensing_role_label(_role)
+                     << " CH " << _rx_io.logical_id
+                     << "] baseline file not found: " << file_path
+                     << "; DC-baseline correction skipped";
+        return;
+    }
+
+    SystemResponseCalibrationFileHeader header{};
+    in.read(reinterpret_cast<char*>(&header), static_cast<std::streamsize>(sizeof(header)));
+    if (!in ||
+        std::memcmp(header.magic, kDcBaselineMagic, sizeof(header.magic)) != 0 ||
+        header.version != kDcBaselineCalibrationVersion) {
+        LOG_G_WARN_M(Sensing) << "[Sensing DCBL " << sensing_role_label(_role)
+                     << " CH " << _rx_io.logical_id
+                     << "] invalid baseline header in " << file_path
+                     << "; DC-baseline correction skipped";
+        return;
+    }
+
+    const std::string expected_mode = sensing_role_label(_role);
+    const std::string file_mode = header_mode_string(header);
+    if (header.role != sensing_role_id(_role) ||
+        file_mode != expected_mode ||
+        header.logical_id != _rx_io.logical_id ||
+        header.fft_size != _cfg.ofdm.fft_size ||
+        !nearly_equal_config_value(header.sample_rate, _cfg.rf_sampling.sample_rate) ||
+        !nearly_equal_config_value(header.center_freq, _cfg.downlink.center_freq) ||
+        !nearly_equal_config_value(header.bandwidth, _cfg.rf_sampling.bandwidth)) {
+        LOG_G_WARN_M(Sensing) << "[Sensing DCBL " << sensing_role_label(_role)
+                     << " CH " << _rx_io.logical_id
+                     << "] baseline file does not match current runtime config: "
+                     << file_path
+                     << "; DC-baseline correction skipped";
+        return;
+    }
+
+    AlignedVector baseline(header.fft_size);
+    in.read(
+        reinterpret_cast<char*>(baseline.data()),
+        static_cast<std::streamsize>(baseline.size() * sizeof(std::complex<float>)));
+    if (!in) {
+        LOG_G_WARN_M(Sensing) << "[Sensing DCBL " << sensing_role_label(_role)
+                     << " CH " << _rx_io.logical_id
+                     << "] baseline file is truncated: " << file_path
+                     << "; DC-baseline correction skipped";
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(_dc_baseline_mutex);
+        auto& cal = _dc_baseline_calibration;
+        cal.baseline = std::move(baseline);
+        cal.loaded = cal.baseline.size() == _cfg.ofdm.fft_size;
+    }
+
+    LOG_G_INFO_M(Sensing) << "[Sensing DCBL " << sensing_role_label(_role)
+                 << " CH " << _rx_io.logical_id
+                 << "] loaded DC baseline: " << file_path
+                 << " (" << header.captured_symbols << " symbols)";
+}
+
+void SensingChannel::_accumulate_dc_baseline_calibration(
+    const AlignedVector& channel_buf,
+    size_t range_stride,
+    size_t symbol_count,
+    size_t fft_size)
+{
+    if (fft_size != _cfg.ofdm.fft_size || range_stride < _cfg.ofdm.fft_size || symbol_count == 0) {
+        return;
+    }
+
+    AlignedVector averaged_baseline;
+    size_t completed_symbols = 0;
+    bool completed = false;
+    {
+        std::lock_guard<std::mutex> lock(_dc_baseline_mutex);
+        auto& cal = _dc_baseline_calibration;
+        if (!cal.capture_active || cal.target_symbols == 0) {
+            return;
+        }
+        if (cal.accumulator.size() != _cfg.ofdm.fft_size) {
+            cal.accumulator.assign(_cfg.ofdm.fft_size, std::complex<float>(0.0f, 0.0f));
+        }
+
+        const size_t remaining = cal.target_symbols - cal.captured_symbols;
+        const size_t rows_to_use = std::min(symbol_count, remaining);
+        for (size_t row = 0; row < rows_to_use; ++row) {
+            const auto* src = channel_buf.data() + row * range_stride;
+            for (size_t bin = 0; bin < _cfg.ofdm.fft_size; ++bin) {
+                cal.accumulator[bin] += src[bin];
+            }
+        }
+
+        cal.captured_symbols += rows_to_use;
+        if (cal.captured_symbols >= cal.target_symbols) {
+            averaged_baseline = cal.accumulator;
+            const float scale = 1.0f / static_cast<float>(cal.captured_symbols);
+            for (auto& value : averaged_baseline) {
+                value *= scale;
+            }
+            cal.baseline = averaged_baseline;
+            cal.loaded = true;
+            cal.capture_active = false;
+            completed_symbols = cal.captured_symbols;
+            completed = true;
+        }
+    }
+
+    if (completed) {
+        LOG_G_INFO_M(Sensing) << "[Sensing DCBL " << sensing_role_label(_role)
+                     << " CH " << _rx_io.logical_id
+                     << "] captured TX-off DC baseline over " << completed_symbols
+                     << " symbols; saving to " << _dc_baseline_calibration_file_path();
+        save_system_response_calibration_async(
+            _dc_baseline_calibration_file_path(),
+            make_dc_baseline_header(_cfg, _role, _rx_io.logical_id, completed_symbols),
+            std::move(averaged_baseline));
+    }
+}
+
+void SensingChannel::_apply_dc_baseline_calibration(
+    AlignedVector& channel_buf,
+    size_t range_stride,
+    size_t symbol_count,
+    size_t fft_size)
+{
+    if (fft_size != _cfg.ofdm.fft_size || range_stride < _cfg.ofdm.fft_size || symbol_count == 0) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(_dc_baseline_mutex);
+    const auto& cal = _dc_baseline_calibration;
+    if (!cal.loaded || cal.baseline.size() != _cfg.ofdm.fft_size) {
+        return;
+    }
+
+    const auto* baseline = cal.baseline.data();
+    for (size_t row = 0; row < symbol_count; ++row) {
+        auto* dst = channel_buf.data() + row * range_stride;
+        #pragma omp simd simdlen(16)
+        for (size_t bin = 0; bin < _cfg.ofdm.fft_size; ++bin) {
+            const float re = dst[bin].real() - baseline[bin].real();
+            const float im = dst[bin].imag() - baseline[bin].imag();
+            dst[bin] = std::complex<float>(re, im);
+        }
+    }
+}
+
 void SensingChannel::_request_shared_batch_reset() {
     if (_batch_reset_requester) {
         _batch_reset_requester();
@@ -1792,6 +2047,10 @@ void SensingChannel::initialize_rx_and_sync(
         if (!io.channel_cfg.rx_antenna.empty()) {
             io.rx_device->set_rx_antenna(io.channel_cfg.rx_antenna, io.channel_cfg.usrp_channel);
         }
+        io.rx_device->set_rx_dc_offset_correction(
+            io.channel_cfg.rx_dc_offset_correction, io.channel_cfg.usrp_channel);
+        io.rx_device->set_rx_iq_balance_correction(
+            io.channel_cfg.rx_iq_balance_correction, io.channel_cfg.usrp_channel);
 
         radio::StreamArgs rx_stream_args("fc32", rx_wire_format);
         rx_stream_args.args["block_id"] = "radio";
@@ -2837,6 +3096,16 @@ void SensingChannel::_sensing_process_finalize(
         symbol_count,
         _compute.sensing_core.params().fft_size);
     _apply_system_response_calibration(
+        channel_buf,
+        _compute.sensing_core.params().range_fft_size,
+        symbol_count,
+        _compute.sensing_core.params().fft_size);
+    _accumulate_dc_baseline_calibration(
+        channel_buf,
+        _compute.sensing_core.params().range_fft_size,
+        symbol_count,
+        _compute.sensing_core.params().fft_size);
+    _apply_dc_baseline_calibration(
         channel_buf,
         _compute.sensing_core.params().range_fft_size,
         symbol_count,
