@@ -112,7 +112,7 @@ Keep the app's own real-time threads off whatever cores you dedicate to IRQs.
 
 Do this before running the sensor for real. Two separate calibrations:
 
-**Hsys (system response) calibration** — needed whenever you change frequency. This characterizes the SDR's own TX/RX filter+DAC/ADC response. Connect TX to RX with a direct RF cable (not the normal antennas, add an inline attenuator if the loopback is too hot), then run `scripts/calibrate_hsys.py` (or click `Calibrate Hsys` in the sensing viewer). It drops TX/RX gain for the loopback capture and restores your normal gains afterwards.
+**Hsys (system response) calibration** — needed whenever you change frequency. This characterizes the SDR's own TX/RX filter+DAC/ADC response. Connect TX to RX with a direct RF cable, then run `scripts/calibrate_hsys.py` (or click `Calibrate Hsys` in the sensing viewer). It drops TX/RX gain for the loopback capture and restores your normal gains afterwards.
 
 **Timing / system-delay calibration** — only needed when the hardware changes (new cable lengths, new RF path, new antennas etc), not when you just change frequency. Set `enable_system_delay_estimation: true` on the sensing channel in `BS.yaml` (before starting BS below), connect the direct RF cable, and watch the BS console for `alignment_suggest=<value>` (`suggest=<value>` on CUDA builds). This comes through fast, within a few seconds of starting — no need to wait around. Once you've got a stable value, write it into the channel's `alignment` field, set `enable_system_delay_estimation` back to `false`, then restore the normal antenna connection.
 
