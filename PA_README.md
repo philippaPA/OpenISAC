@@ -14,6 +14,16 @@ laptop: ubuntu laptop (not pa locked). Could also try running on a windows lapto
 
 ## Requirements
 
+Only Ubuntu 24.04 is supported/tested — the Ettus UHD guide's dependency instructions only go up to 24.04, and that's what OpenISAC itself has been tested against. Check your version with `lsb_release -a` (or `cat /etc/os-release`); if you're on anything else (including newer non-LTS releases like 26.04), you need Ubuntu 24.04 instead:
+
+- **On Windows:** install it via WSL:
+  ```bash
+  wsl --list --online
+  wsl --install -d Ubuntu-24.04
+  ```
+  Then do all of the setup below inside that Ubuntu 24.04 WSL instance.
+- **On a native Ubuntu laptop running a different version:** you'll need to reinstall/dual-boot Ubuntu 24.04 itself (e.g. from the [official Ubuntu 24.04 image](https://releases.ubuntu.com/24.04/)) — WSL doesn't apply here, it's only for running Ubuntu inside Windows.
+
 ### 1. Clone OpenISAC
 
 ```bash
