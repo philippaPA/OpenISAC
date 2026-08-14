@@ -155,6 +155,24 @@ sudo ../scripts/isolate_cpus.py run ./BS
 python3 ./scripts/plot_sensing_fast.py
 ```
 
+## Troubleshooting: USRP not found / connection issues
+
+If `BS` can't find or initialize the B205mini:
+
+1. Check it shows up over USB at all:
+   ```bash
+   lsusb
+   ```
+   Look for an Ettus Research / National Instruments entry. If it's not listed, it's a USB/cable/power problem, not an OpenISAC one.
+
+2. Confirm UHD itself can see the device:
+   ```bash
+   uhd_find_devices
+   ```
+   This talks to UHD directly, bypassing OpenISAC entirely — if it doesn't list the B205mini, the problem is in UHD/USB, not in `BS.yaml` or the OpenISAC config.
+
+3. The B205mini needs USB 3 directly — avoid hubs or a shared high-throughput USB controller, and double check the cable and power.
+
 ## Parameters used
 
 For the drone detection run above: `symbol_stride` (STRD) 50, TX gain 70, RX gain 42, centre frequency 5.8 GHz. These worked for our setup but are worth playing with for yours — stride trades off Doppler resolution/Nyquist range, and gains depend on your antennas and range to target.
