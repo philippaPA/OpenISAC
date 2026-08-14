@@ -1,10 +1,10 @@
-OpenISAC allows a demontration of usingn a communication wave as sesning. It is part of a larger internship project on drone detection conducted by Henry Teall and Philippa Flintoff in the summer of 2026.
+OpenISAC allows a demonstration of using a communication wave as sensing. It is part of a larger internship project on drone detection conducted by Henry Teall and Philippa Flintoff in the summer of 2026.
 
-During this experimentation a short range isac sensor was able to recieve micro doppler signals detecting a dji neo drone. 
+During this experimentation a short range isac sensor was able to receive micro doppler signals detecting a dji neo drone. 
 
 The equipment used:
 
-Drone: DJI NEO. (Risk assessment only covered the use of a drone with covered propellors. 
+Drone: DJI NEO. (Risk assessment only covered the use of a drone with covered propellers. 
 
 Antennas: pcb logarithmic antennas. (tested omnidirectional although nothing detected. PA has horn antennas in the optics lab which could produce a better result.)
 
@@ -32,6 +32,8 @@ git clone https://github.com/philippaPA/OpenISAC.git
 ```
 
 ### 2. UHD (USRP Hardware Driver)
+
+This step is quite confusing — the Ettus guide covers both UHD and GNU Radio together, and it's not always obvious which parts you actually need. We only need UHD, not GNU Radio, so take it slowly and follow it step by step rather than skimming.
 
 Install the UHD toolchain by following the official Ettus guide (Ubuntu 24.04 tutorial):
 [Building and Installing the USRP Open-Source Toolchain on Linux](https://kb.ettus.com/Building_and_Installing_the_USRP_Open-Source_Toolchain_(UHD_and_GNU_Radio)_on_Linux#Update_and_Install_dependencies)
