@@ -33,7 +33,7 @@ cuda:
 
 # ===== Downlink =====
 downlink:
-  center_freq: 5.8e9  # RF center frequency (Hz) — 5.5 GHz; within B205mini/AD9364 tuning range (70 MHz - 6 GHz), verify local TX licensing at this frequency
+  center_freq: 5.8e9  # RF center frequency (Hz) — 5.8 GHz; within B205mini/AD9364 tuning range (70 MHz - 6 GHz), verify local TX licensing at this frequency
   tx_gain: 30  # TX gain (dB) — carried over from B210 template; re-check against B205mini's normalized gain range before first transmit
   tx_channel: 0  # TX channel index on USRP (B205mini exposes only channel 0)
   tx_device_args: ""  # TX-specific args (empty = use device_args)
