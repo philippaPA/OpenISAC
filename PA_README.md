@@ -70,47 +70,65 @@ pip install -r requirements.txt
 
 `source .venv/bin/activate` needs to be re-run in every new terminal you use for frontend scripts (e.g. `plot_sensing_fast.py`, `calibrate_hsys.py`); you'll see `(.venv)` in your prompt once it's active. Run `deactivate` to leave it.
 
-## Running the sensor
+## Config
 
-1. Choose the B205mini config and copy it into `build/` as `BS.yaml`:
+Before running anything, choose the B205mini config and copy it into `build/` as `BS.yaml`:
 
-   ```bash
-   cd build
-   cp ../config/BS_B205.yaml BS.yaml
-   ```
+```bash
+cd build
+cp ../config/BS_B205.yaml BS.yaml
+```
 
-2. Run the BS backend from `build/`:
-
-   ```bash
-   sudo ../scripts/isolate_cpus.py
-   sudo ../scripts/isolate_cpus.py run ./BS
-   ```
-
-3. In another terminal, run the fast sensing plot to view the sensor output:
-
-   ```bash
-   python3 ./scripts/plot_sensing_fast.py
-   ```
-
-## Calibration
-
-Two separate calibrations, don't confuse them:
-
-**Hsys (system response) calibration** — needed whenever you change frequency. This characterizes the SDR's own TX/RX filter+DAC/ADC response. Connect TX to RX with a direct RF cable (not the normal antennas, add an inline attenuator if the loopback is too hot), then run `scripts/calibrate_hsys.py` (or click `Calibrate Hsys` in the sensing viewer). It drops TX/RX gain for the loopback capture and restores your normal gains afterwards.
-
-**Timing / system-delay calibration** — only needed when the hardware changes (new cable lengths, new RF path, new antennas etc), not when you just change frequency. Set `enable_system_delay_estimation: true` on the sensing channel in `BS.yaml` with a direct RF connection, start the BS, and watch the console for `alignment_suggest=<value>` (`suggest=<value>` on CUDA builds). Once it settles, write that value into the channel's `alignment` field, set `enable_system_delay_estimation` back to `false`, then restore the normal antenna connection.
-
-Run system-delay calibration before Hsys — Hsys assumes the RX frame is already aligned to the direct-path timing reference.
+Do this first — both calibration and the sensor run below start `BS` from `build/`, and it reads `BS.yaml` from that directory.
 
 ## CPU performance (core prioritisation)
 
-Run `./scripts/set_performance.bash` before an OTA run to tune the host for real-time processing (socket buffers, CPU governor, NIC ring/MTU, and pinning NIC IRQs off onto their own cores so they don't fight the app for CPU time). If you have isolated CPU cores set up (`/sys/devices/system/cpu/isolated`) it'll use those automatically for IRQ pinning; otherwise set `OPENISAC_IRQ_CORE_LIST` yourself, e.g.:
+Run this before starting `BS`, whether for calibration or a real run:
+
+```bash
+./scripts/set_performance.bash
+```
+
+This tunes the host for real-time processing (socket buffers, CPU governor, NIC ring/MTU, and pinning NIC IRQs off onto their own cores so they don't fight the app for CPU time). If you have isolated CPU cores set up (`/sys/devices/system/cpu/isolated`) it'll use those automatically for IRQ pinning; otherwise set `OPENISAC_IRQ_CORE_LIST` yourself, e.g.:
 
 ```bash
 OPENISAC_IRQ_CORE_LIST=14-15 ./scripts/set_performance.bash
 ```
 
 Keep the app's own real-time threads off whatever cores you dedicate to IRQs.
+
+## Calibration
+
+Do this before running the sensor for real. Two separate calibrations, don't confuse them:
+
+**Terminal 1 — start BS:**
+```bash
+cd build
+sudo ../scripts/isolate_cpus.py
+sudo ../scripts/isolate_cpus.py run ./BS
+```
+
+**Terminal 2 — run the calibration you need:**
+
+**Hsys (system response) calibration** — needed whenever you change frequency. This characterizes the SDR's own TX/RX filter+DAC/ADC response. Connect TX to RX with a direct RF cable (not the normal antennas, add an inline attenuator if the loopback is too hot), then run `scripts/calibrate_hsys.py` (or click `Calibrate Hsys` in the sensing viewer). It drops TX/RX gain for the loopback capture and restores your normal gains afterwards.
+
+**Timing / system-delay calibration** — only needed when the hardware changes (new cable lengths, new RF path, new antennas etc), not when you just change frequency. Set `enable_system_delay_estimation: true` on the sensing channel in `BS.yaml` (before starting BS in Terminal 1), connect the direct RF cable, and watch the Terminal 1 console for `alignment_suggest=<value>` (`suggest=<value>` on CUDA builds). This comes through fast, within a few seconds of starting — no need to wait around. Once you've got a stable value, write it into the channel's `alignment` field, set `enable_system_delay_estimation` back to `false`, then restore the normal antenna connection.
+
+Run system-delay calibration before Hsys — Hsys assumes the RX frame is already aligned to the direct-path timing reference.
+
+## Running the sensor
+
+**Terminal 1 — BS backend:**
+```bash
+cd build
+sudo ../scripts/isolate_cpus.py
+sudo ../scripts/isolate_cpus.py run ./BS
+```
+
+**Terminal 2 — fast sensing plot:**
+```bash
+python3 ./scripts/plot_sensing_fast.py
+```
 
 ## Parameters used
 
