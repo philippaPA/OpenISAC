@@ -33,7 +33,7 @@ git clone https://github.com/philippaPA/OpenISAC.git
 
 ### 2. UHD (USRP Hardware Driver)
 
-This step is quite confusing — the Ettus guide covers both UHD and GNU Radio together, and it's not always obvious which parts you actually need. We only need UHD, not GNU Radio, so take it slowly and follow it step by step rather than skimming.
+This step is quite confusing.
 
 Install the UHD toolchain by following the official Ettus guide (Ubuntu 24.04 tutorial):
 [Building and Installing the USRP Open-Source Toolchain on Linux](https://kb.ettus.com/Building_and_Installing_the_USRP_Open-Source_Toolchain_(UHD_and_GNU_Radio)_on_Linux#Update_and_Install_dependencies)
