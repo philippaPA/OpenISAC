@@ -163,15 +163,12 @@ If `BS` can't find or initialize the B205mini:
    ```bash
    lsusb
    ```
-   Look for an Ettus Research / National Instruments entry. If it's not listed, it's a USB/cable/power problem, not an OpenISAC one.
+   Look for an Ettus Research / National Instruments entry.
 
 2. Confirm UHD itself can see the device:
    ```bash
    uhd_find_devices
    ```
-   This talks to UHD directly, bypassing OpenISAC entirely — if it doesn't list the B205mini, the problem is in UHD/USB, not in `BS.yaml` or the OpenISAC config.
-
-3. The B205mini needs USB 3 directly — avoid hubs or a shared high-throughput USB controller, and double check the cable and power.
 
 ## Parameters used
 
