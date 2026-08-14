@@ -82,9 +82,10 @@ pip install -r requirements.txt
 
 ## Config
 
-Before running anything, choose the B205mini config and copy it into `build/` as `BS.yaml`:
+Before running anything, choose the B205mini config, edit it with `nano` for your settings (gains, stride, frequency, etc.), then copy it into `build/` as `BS.yaml`:
 
 ```bash
+nano config/BS_B205.yaml
 cd build
 cp ../config/BS_B205.yaml BS.yaml
 ```
@@ -111,6 +112,12 @@ Keep the app's own real-time threads off whatever cores you dedicate to IRQs.
 
 Do this before running the sensor for real. Two separate calibrations, don't confuse them:
 
+**Hsys (system response) calibration** — needed whenever you change frequency. This characterizes the SDR's own TX/RX filter+DAC/ADC response. Connect TX to RX with a direct RF cable (not the normal antennas, add an inline attenuator if the loopback is too hot), then run `scripts/calibrate_hsys.py` (or click `Calibrate Hsys` in the sensing viewer). It drops TX/RX gain for the loopback capture and restores your normal gains afterwards.
+
+**Timing / system-delay calibration** — only needed when the hardware changes (new cable lengths, new RF path, new antennas etc), not when you just change frequency. Set `enable_system_delay_estimation: true` on the sensing channel in `BS.yaml` (before starting BS below), connect the direct RF cable, and watch the BS console for `alignment_suggest=<value>` (`suggest=<value>` on CUDA builds). This comes through fast, within a few seconds of starting — no need to wait around. Once you've got a stable value, write it into the channel's `alignment` field, set `enable_system_delay_estimation` back to `false`, then restore the normal antenna connection.
+
+Run system-delay calibration before Hsys — Hsys assumes the RX frame is already aligned to the direct-path timing reference.
+
 **Terminal 1 — start BS:**
 ```bash
 cd build
@@ -119,12 +126,6 @@ sudo ../scripts/isolate_cpus.py run ./BS
 ```
 
 **Terminal 2 — run the calibration you need:**
-
-**Hsys (system response) calibration** — needed whenever you change frequency. This characterizes the SDR's own TX/RX filter+DAC/ADC response. Connect TX to RX with a direct RF cable (not the normal antennas, add an inline attenuator if the loopback is too hot), then run `scripts/calibrate_hsys.py` (or click `Calibrate Hsys` in the sensing viewer). It drops TX/RX gain for the loopback capture and restores your normal gains afterwards.
-
-**Timing / system-delay calibration** — only needed when the hardware changes (new cable lengths, new RF path, new antennas etc), not when you just change frequency. Set `enable_system_delay_estimation: true` on the sensing channel in `BS.yaml` (before starting BS in Terminal 1), connect the direct RF cable, and watch the Terminal 1 console for `alignment_suggest=<value>` (`suggest=<value>` on CUDA builds). This comes through fast, within a few seconds of starting — no need to wait around. Once you've got a stable value, write it into the channel's `alignment` field, set `enable_system_delay_estimation` back to `false`, then restore the normal antenna connection.
-
-Run system-delay calibration before Hsys — Hsys assumes the RX frame is already aligned to the direct-path timing reference.
 
 ## Running the sensor
 
