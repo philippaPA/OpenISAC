@@ -2,7 +2,7 @@
 
 > [!IMPORTANT]
 
-> **PA Users:** Please read **PA_README.md**. I have spent countless hours, weeks, and years working out how this works. This README was of no help.
+> **PA Users:** Please read **PA_README.md**. I have spent countless hours, weeks, and years working out how this works. This README was of no help. Although if you struggle with PA_README.md then feel free to do this way as well.
 
 >
 
