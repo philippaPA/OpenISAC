@@ -10,7 +10,7 @@ Antennas: pcb logarithmic antennas. (tested omnidirectional although nothing det
 
 SDR: ettus B205mini 
 
-laptop: ubuntu laptop (not pa locked)
+laptop: ubuntu laptop (not pa locked). Could also try running on a windows laptop with wsl. I tried briefly but gave up quick.
 
 ## Requirements
 
