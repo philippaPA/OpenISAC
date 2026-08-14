@@ -14,14 +14,21 @@ laptop: ubuntu laptop (not pa locked)
 
 ## Requirements
 
-### 1. UHD (USRP Hardware Driver)
+### 1. Clone OpenISAC
+
+```bash
+cd ~
+git clone https://github.com/philippaPA/OpenISAC.git
+```
+
+### 2. UHD (USRP Hardware Driver)
 
 Install the UHD toolchain by following the official Ettus guide (Ubuntu 24.04 tutorial):
 [Building and Installing the USRP Open-Source Toolchain on Linux](https://kb.ettus.com/Building_and_Installing_the_USRP_Open-Source_Toolchain_(UHD_and_GNU_Radio)_on_Linux#Update_and_Install_dependencies)
 
 Tested on UHD v4.9.0.1 (`git checkout v4.9.0.1`).
 
-### 2. Aff3ct (Forward Error Correction library)
+### 3. Aff3ct (Forward Error Correction library)
 
 ```bash
 sudo apt-get install nlohmann-json3-dev
@@ -35,7 +42,7 @@ make -j$(nproc)
 sudo make install
 ```
 
-### 3. Build OpenISAC
+### 4. Build OpenISAC
 
 ```bash
 sudo apt-get install libyaml-cpp-dev libzmq3-dev cppzmq-dev
@@ -48,7 +55,7 @@ make -j$(nproc)
 
 This produces `build/BS` and `build/UE`.
 
-### 4. Frontend (Python)
+### 5. Frontend (Python)
 
 Python 3.13, dependencies listed in `requirements.txt` at the repo root (numpy, matplotlib, scipy, PyQt6, pyqtgraph, PyYAML, pyzmq, etc).
 
