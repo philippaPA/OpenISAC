@@ -114,13 +114,13 @@ Keep the app's own real-time threads off whatever cores you dedicate to IRQs.
 
 ## Calibration
 
-Do this before running the sensor for real. Two separate calibrations:
+Do this before running the sensor for real. Two separate calibrations, both done with a direct RF cable between TX and RX instead of the normal antennas:
 
-**Hsys (system response) calibration** — needed whenever you change frequency. This characterizes the SDR's own TX/RX filter+DAC/ADC response. Connect TX to RX with a direct RF cable. Follow the instructions below to run it — you need BS and the fast sensing plot both running, then click `Calibrate Hsys` in the viewer (or run `scripts/calibrate_hsys.py` directly). It drops TX/RX gain for the loopback capture and restores your normal gains afterwards.
+**IMPORTANT — keep gains low while directly connected.** This applies to both calibrations below. A direct cable has almost none of the path loss your normal antennas give you, so your normal operating gains will saturate/clip the RX front end. We used RX gain 30 and TX gain 10 for the direct-connection calibration.
 
-**IMPORTANT — keep gains low while directly connected.** A direct cable has almost none of the path loss your normal antennas give you, so your normal operating gains will saturate/clip the RX front end. We used RX gain 30 and TX gain 10 for the direct-connection calibration.
+**Hsys (system response) calibration** — needed whenever you change frequency. This characterizes the SDR's own TX/RX filter+DAC/ADC response. Follow the instructions below to run it — you need BS and the fast sensing plot both running, then click `Calibrate Hsys` in the viewer (or run `scripts/calibrate_hsys.py` directly). It drops TX/RX gain for the loopback capture and restores your normal gains afterwards.
 
-**IMPORTANT — turn off MTI first.** The MTI (Moving Target Indication) filter suppresses static content, but the loopback signal during Hsys calibration is static — so with MTI on you won't see it come through. Turn off the `MTI` toggle in the sensing viewer before calibrating.
+**IMPORTANT — turn off MTI first (Hsys only).** The MTI (Moving Target Indication) filter suppresses static content, but the loopback signal during Hsys calibration is static — so with MTI on you won't see it come through. Turn off the `MTI` toggle in the sensing viewer before calibrating.
 
 **Timing / system-delay calibration** — only needed when the hardware changes (new cable lengths, new RF path, new antennas etc), not when you just change frequency. Set `enable_system_delay_estimation: true` on the sensing channel in `BS.yaml` (before starting BS below), connect the direct RF cable, and watch the BS console for `alignment_suggest=<value>` (`suggest=<value>` on CUDA builds). This comes through fast, within a few seconds of starting — no need to wait around. Once you've got a stable value, write it into the channel's `alignment` field, set `enable_system_delay_estimation` back to `false`, then restore the normal antenna connection.
 
